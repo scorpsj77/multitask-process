@@ -98,7 +98,41 @@ void* allocate (int size) {
   void* ptr = NULL;
   
   /* TO BE COMPLETED */
-  // 
+  if (size <= 0) return NULL;
+
+  // rounds up size upward to a multiple of the required alignment
+  word_t block_size = ALIGN_UP((word_t) size);
+
+  // initialize the block that we are traversing from
+  header_s* current_head = free_head.next;
+
+  while (current_head != &free_tail) {
+    // found a free block that is big enough for the requested size
+    if (current_head->size >= block_size) {
+      // remove this block from free list
+      current_head->prev->next = current_head->next;
+      current_head->next->prev = current_head->prev;
+
+      // point to the usable memory after its header
+      ptr = HEADER_TO_BLOCK(current_head);
+
+      current_head->next = NULL;
+      current_head->prev = NULL;
+      break;
+    }
+    current_head = current_head->next;
+  }
+
+  // no blocks in free list or none of the blocks fit
+  if (ptr == NULL) {
+    header_s* header = (header_s*) heap_limit;
+    header->size = block_size;
+    // they point to null since the block is immediately occupied and hence not part of free list
+    header->next = NULL;
+    header->prev = NULL;
+    ptr = HEADER_TO_BLOCK(header);
+    heap_limit += sizeof(header_s) + block_size;
+  }
 
   /* Assuming that `ptr` has been set to point to a newly allocated block, show its address and then return it. */
   print_hex((word_t)ptr);
@@ -107,8 +141,6 @@ void* allocate (int size) {
   
 } /* allocate () */
 /* =============================================================================================================================== */
-
-
 
 /* =============================================================================================================================== */
 void deallocate (void* ptr) {
@@ -123,6 +155,16 @@ void deallocate (void* ptr) {
   header_s* header;
   
   /* TO BE COMPLETED */
+  // find the header immediately before the ptr
+  header = BLOCK_TO_HEADER(ptr);
+
+  // connect this header to the head of the free list
+  header->prev = &free_head;
+  header->next = free_head.next;
+
+  // update the original first block to point back to it
+  free_head.next->prev = header;
+  free_head.next = header;
 
   print_dec(header->size);
   print("]\n");
